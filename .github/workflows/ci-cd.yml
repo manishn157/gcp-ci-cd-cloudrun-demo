@@ -28,6 +28,8 @@ jobs:
           pip install -r app/requirements.txt
 
       - name: Run unit tests
+        env:
+          PYTHONPATH: .
         run: pytest -q app/tests
 
       - name: Authenticate to GCP (OIDC)
