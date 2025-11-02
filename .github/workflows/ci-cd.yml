@@ -1,0 +1,90 @@
+name: CI/CD → Cloud Run
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r app/requirements.txt
+
+      - name: Run unit tests
+        run: pytest -q app/tests
+
+      - name: Authenticate to GCP (OIDC)
+        uses: google-github-actions/auth@v1
+        with:
+          # Workload identity provider configured in GCP; set this in repo Secrets
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          # Service account to impersonate (must exist in the target project)
+          service_account: ${{ secrets.GCP_SA_EMAIL }}
+
+      - name: Set up gcloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: ${{ secrets.GCP_PROJECT }}
+
+      - name: Build & push image to Artifact Registry
+        env:
+          REGION: ${{ secrets.REGION }}
+          PROJECT: ${{ secrets.GCP_PROJECT }}
+          REPO: ${{ secrets.ARTIFACT_REPO }}
+        run: |
+          set -euo pipefail
+          IMAGE=${REGION}-docker.pkg.dev/${PROJECT}/${REPO}/demo:${{ github.sha }}
+          echo "Building and submitting image: $IMAGE"
+          gcloud builds submit --tag "$IMAGE"
+
+      - name: Deploy to Cloud Run with smoke test and rollback
+        env:
+          REGION: ${{ secrets.REGION }}
+          PROJECT: ${{ secrets.GCP_PROJECT }}
+        run: |
+          set -euo pipefail
+
+          SERVICE=demo
+          IMAGE=${{ secrets.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/${{ secrets.ARTIFACT_REPO }}/demo:${{ github.sha }}
+
+          echo "Fetching previous revision (if any)"
+          PREV_REVISION=$(gcloud run services describe "$SERVICE" --region "$REGION" --format="value(status.traffic[0].revisionName)" || true)
+          echo "Previous revision: ${PREV_REVISION:-<none>}"
+
+          echo "Deploying $SERVICE -> $IMAGE"
+          gcloud run deploy "$SERVICE" --image "$IMAGE" --region "$REGION" --platform managed --allow-unauthenticated --quiet
+
+          SERVICE_URL=$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')
+          echo "Service URL: $SERVICE_URL"
+
+          echo "Running smoke test against $SERVICE_URL"
+          if ./scripts/smoke_test.sh "$SERVICE_URL"; then
+            echo "Smoke test passed"
+          else
+            echo "Smoke test failed — attempting rollback"
+            if [ -n "$PREV_REVISION" ]; then
+              echo "Rolling back to $PREV_REVISION"
+              gcloud run services update-traffic "$SERVICE" --to-revisions "$PREV_REVISION"=100 --region "$REGION" --platform managed || true
+              echo "Rollback requested"
+            else
+              echo "No previous revision found to rollback to"
+            fi
+            exit 1
+          fi

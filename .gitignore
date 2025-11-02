@@ -1,0 +1,17 @@
+# Byte-compiled / cache
+__pycache__/
+*.pyc
+
+# venv
+.venv/
+
+# Docker
+*.docker
+
+# Terraform
+.terraform/
+terraform.tfstate
+terraform.tfstate.backup
+
+# IDE
+.vscode/
