@@ -54,7 +54,7 @@ jobs:
           set -euo pipefail
           IMAGE=${REGION}-docker.pkg.dev/${PROJECT}/${REPO}/demo:${{ github.sha }}
           echo "Building and submitting image: $IMAGE"
-          gcloud builds submit app/ --tag "$IMAGE"
+          gcloud builds submit app/ --tag "$IMAGE" --gcs-log-dir=gs://resolute-radar-343608-cloudbuild-logs/logs/
 
       - name: Deploy to Cloud Run with smoke test and rollback
         env:
