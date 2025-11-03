@@ -103,6 +103,13 @@ gcloud iam service-accounts add-iam-policy-binding "gha-deployer@PROJECT.iam.gse
   --project="PROJECT" \
   --role="roles/iam.workloadIdentityUser" \
   --member="principalSet://iam.googleapis.com/projects/PROJECT/locations/global/workloadIdentityPools/github-pool/attribute.repository/REPO_OWNER/REPO_NAME"
+
+gcloud.cmd iam workload-identity-pools create "github-pool-new" --project="resolute-radar-343608" --location=global --display-name="GitHub Actions Pool"
+
+gcloud.cmd iam workload-identity-pools providers list --workload-identity-pool="github-pool-new" --location="global" --project="resolute-radar-343608"
+
+gcloud.cmd iam service-accounts add-iam-policy-binding "gha-deployer@resolute-radar-343608.iam.gserviceaccount.com" --project="resolute-radar-343608" --role="roles/iam.workloadIdentityUser" --member="principalSet://iam.googleapis.com/projects/34199410565/locations/global/workloadIdentityPools/github-pool-new/attribute.repository/manishn157/gcp-ci-cd-cloudrun-demo"
+
 ```
 
 Notes:
