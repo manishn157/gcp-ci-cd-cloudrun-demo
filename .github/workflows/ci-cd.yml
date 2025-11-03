@@ -55,7 +55,10 @@ jobs:
           IMAGE=${REGION}-docker.pkg.dev/${PROJECT}/${REPO}/demo:${{ github.sha }}
           echo "Building and submitting image: $IMAGE"
           gcloud builds submit app/ --tag "$IMAGE" --gcs-log-dir=gs://resolute-radar-343608-cloudbuild-logs/logs/
-
+      
+      - name: Make smoke test script executable
+        run: chmod +x scripts/smoke_test.sh
+        
       - name: Deploy to Cloud Run with smoke test and rollback
         env:
           REGION: ${{ secrets.REGION }}
@@ -77,6 +80,7 @@ jobs:
           echo "Service URL: $SERVICE_URL"
 
           echo "Running smoke test against $SERVICE_URL"
+          
           if ./scripts/smoke_test.sh "$SERVICE_URL"; then
             echo "Smoke test passed"
           else
