@@ -54,7 +54,7 @@ jobs:
           set -euo pipefail
           IMAGE=${REGION}-docker.pkg.dev/${PROJECT}/${REPO}/demo:${{ github.sha }}
           echo "Building and submitting image: $IMAGE"
-          gcloud builds submit --tag "$IMAGE"
+          gcloud builds submit app/ --tag "$IMAGE"
 
       - name: Deploy to Cloud Run with smoke test and rollback
         env:
